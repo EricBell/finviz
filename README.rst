@@ -36,13 +36,19 @@ Installation
 
 .. code:: bash
 
+    uv add finviz
+
+Or with pip:
+
+.. code:: bash
+
     pip install finviz
 
 Or install the latest development version:
 
 .. code:: bash
 
-    pip install git+https://github.com/mariostoev/finviz@v2-development
+    uv pip install git+https://github.com/mariostoev/finviz@v2-development
 
 
 What is Finviz?
@@ -241,13 +247,13 @@ Development
     # Clone and install in development mode
     git clone https://github.com/mariostoev/finviz
     cd finviz
-    pip install -e ".[dev]"
+    uv sync --dev
 
     # Run tests
-    pytest finviz/tests/ -v
+    uv run pytest finviz/tests/ -v
 
     # Run tests (skip slow ones)
-    pytest finviz/tests/ -v -m "not slow"
+    uv run pytest finviz/tests/ -v -m "not slow"
 
 
 *You can also buy me a coffee!*

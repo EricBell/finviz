@@ -32,12 +32,18 @@ def _norm(text: str) -> str:
 def _find_choice(group_name: str, predicate) -> str:
     options = _get_filter_options()
     target = _norm(group_name)
-    group = None
+
+    exact = None
+    prefix = None
     for key, value in options.items():
         key_norm = _norm(key)
-        if key_norm == target or key_norm.startswith(target) or target.startswith(key_norm):
-            group = value
+        if key_norm == target:
+            exact = value
             break
+        if prefix is None and (key_norm.startswith(target) or target.startswith(key_norm)):
+            prefix = value
+
+    group = exact or prefix
     if not group:
         raise FinvizInvalidFilterError(f"Unknown filter group: {group_name}")
     for label, tag in group.items():
@@ -86,10 +92,20 @@ def _choice_for_market_cap(market_cap: Any) -> str | None:
     raise FinvizInvalidFilterError(f"Unknown market cap class: {market_cap!r}")
 
 
-def _choice_for_price(price: Any) -> str | None:
+def _choice_for_price(price: Any) -> list[str]:
     if price is None:
-        return None
+        return []
+
     if isinstance(price, dict):
+        # Range form: {"min": 2, "max": 10}
+        if price.get("min") is not None or price.get("max") is not None:
+            out: list[str] = []
+            if price.get("min") is not None:
+                out.append(_choice_contains("Price $", f"Over ${int(float(price['min']))}"))
+            if price.get("max") is not None:
+                out.append(_choice_contains("Price $", f"Under ${int(float(price['max']))}"))
+            return out
+
         relation = str(price.get("relation") or price.get("op") or price.get("direction") or "").lower()
         value = price.get("value")
     else:
@@ -97,9 +113,9 @@ def _choice_for_price(price: Any) -> str | None:
         value = price
 
     if value is None:
-        return None
+        return []
     relation = relation or "over"
-    return _choice_contains("Price $", f"{relation.title()} ${int(float(value))}")
+    return [_choice_contains("Price $", f"{relation.title()} ${int(float(value))}")]
 
 
 def _choice_for_percent(group: str, amount: Any, *, relation: str = "over") -> str | None:
@@ -163,7 +179,7 @@ def compile_semantic_filters(criteria: dict) -> list[str]:
         filters.append(_choice_for_market_cap(market_cap))
 
     if price := criteria.get("price"):
-        filters.append(_choice_for_price(price))
+        filters.extend(_choice_for_price(price))
 
     performance = criteria.get("performance") or {}
     if isinstance(performance, dict):

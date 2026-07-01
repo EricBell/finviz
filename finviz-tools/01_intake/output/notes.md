@@ -1,7 +1,7 @@
 # Intake Notes
 
 ## Request
-Find top 5 large cap energy stocks that are up at least 3% since the open.
+Find top 5 small cap  stocks that are up at least 3% since the open, less than $10 and more than $2. If there are none, create an empty final.md file.
 
 ## Objective
 Finviz screen request
@@ -13,12 +13,15 @@ Finviz screen request
   "tool": "finviz.screen",
   "mode": "screen",
   "criteria": {
-    "sector": "Energy",
     "market_cap": {
-      "class": "large"
+      "class": "small"
     },
     "performance": {
       "change_from_open_gte": 3
+    },
+    "price": {
+      "max": 10.0,
+      "min": 2.0
     },
     "limit": 5,
     "ranking": {
@@ -33,7 +36,7 @@ Finviz screen request
 - Use the selected Finviz tool and return a concise result set.
 
 ## Assumptions
-- Interpreted 'large cap' as a large-cap Finviz screen.
+- none recorded
 
 ## Open Questions
 - none recorded

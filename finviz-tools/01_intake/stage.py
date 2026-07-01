@@ -69,7 +69,7 @@ Rules:
 - Preferred semantic fields:
   - sector, industry, exchange, index
   - market_cap: {"class": "large|mid|small|micro|nano"}
-  - price: {"relation": "over|under", "value": number}
+  - price: {"relation": "over|under", "value": number} or {"min": number, "max": number}
   - performance: {"change_from_open_gte": number, "gap_up_gte": number, "change_gte": number}
   - liquidity: {"relative_volume_gte": number, "average_volume_gte": number}
   - technical: {"sma": {"period": 20|50|200, "relation": "above|below|crossabove|crossbelow"}}
@@ -80,6 +80,8 @@ Rules:
     domain finviz, tool finviz.screen, criteria {"sector":"Energy","market_cap":{"class":"large"},"performance":{"change_from_open_gte":3},"limit":5}
   - "low priced breakout stocks with relative volume above 2 and price above the 50 day moving average" ->
     criteria {"price":{"relation":"under","value":10},"liquidity":{"relative_volume_gte":2},"technical":{"sma":{"period":50,"relation":"above"}},"limit":7}
+  - "price <$10 and >$2" ->
+    criteria {"price":{"min":2,"max":10}}
 - If the request is ambiguous, add assumptions and open questions.
 """
 
@@ -150,7 +152,18 @@ def _semantic_fallback(request_text: str) -> dict[str, Any]:
         if any(phrase in text for phrase in ("relative volume", "rvol", "rel vol")):
             match = re.search(r"(?:relative volume|rvol|rel vol)\s*(?:above|over|>|>=)?\s*([\d.]+)", text)
             criteria.setdefault("liquidity", {})["relative_volume_gte"] = float(match.group(1)) if match else 2
-        if any(phrase in text for phrase in ("low priced", "cheap", "penny stock")):
+        price_match = re.search(r"(?:price\s*)?(?:<|less than|under|below)\s*\$?\s*(\d+(?:\.\d+)?)", text)
+        if price_match:
+            criteria.setdefault("price", {})["max"] = float(price_match.group(1))
+        price_match = re.search(r"(?:price\s*)?(?:>|more than|over|above)\s*\$?\s*(\d+(?:\.\d+)?)", text)
+        if price_match:
+            criteria.setdefault("price", {})["min"] = float(price_match.group(1))
+        range_match = re.search(r"\$?\s*(\d+(?:\.\d+)?)\s*(?:to|-|and)\s*\$?\s*(\d+(?:\.\d+)?)", text)
+        if range_match and "price" in text:
+            low = float(range_match.group(1))
+            high = float(range_match.group(2))
+            criteria["price"] = {"min": min(low, high), "max": max(low, high)}
+        if any(phrase in text for phrase in ("low priced", "cheap", "penny stock")) and "price" not in criteria:
             criteria["price"] = {"relation": "under", "value": 10}
         if "above the 50 day moving average" in text or "above sma50" in text or "sma50" in text:
             criteria.setdefault("technical", {})["sma"] = {"period": 50, "relation": "above"}

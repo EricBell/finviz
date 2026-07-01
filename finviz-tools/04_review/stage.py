@@ -35,15 +35,18 @@ def main() -> None:
         "",
     ]
 
-    final = [
-        "# Final Output",
-        "",
-        draft_text.strip(),
-        "",
-    ]
-
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    FINAL_MD.write_text("\n".join(final), encoding="utf-8")
+    if "Rows: 0" in draft_text or "No results." in draft_text:
+        FINAL_MD.write_text("", encoding="utf-8")
+        review.append("- No results found; wrote an empty final.md as requested.")
+    else:
+        final = [
+            "# Final Output",
+            "",
+            draft_text.strip(),
+            "",
+        ]
+        FINAL_MD.write_text("\n".join(final), encoding="utf-8")
     REVIEW_MD.write_text("\n".join(review), encoding="utf-8")
 
     print(f"Wrote {FINAL_MD}")

@@ -111,3 +111,5 @@ ENV/
 
 # CSV files
 *.csv
+
+**/output/**/*.json

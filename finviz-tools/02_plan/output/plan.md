@@ -1,7 +1,7 @@
 # Execution Plan
 
 ## Objective
-None
+Finviz screen request
 
 ## Steps
 - execute: Perform the requested work using the structured task and any shared helpers.

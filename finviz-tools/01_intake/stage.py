@@ -14,6 +14,8 @@ import re
 from pathlib import Path
 from typing import Any
 
+from shared.finviz.errors import FinvizInvalidFilterError
+from shared.finviz.validate import validate_task
 from shared.llm import LLMError, chat_json
 
 STAGE_DIR = Path(__file__).resolve().parent
@@ -222,18 +224,32 @@ def _coerce_task(spec: Any, request_text: str) -> dict[str, Any]:
     return task
 
 
+def _validate_or_flag(task: dict[str, Any]) -> dict[str, Any]:
+    """Validate a task; on failure, keep the task but record why it's suspect.
+
+    Intake is not allowed to crash the pipeline over a malformed DSL, so
+    validation failures degrade to an open question rather than an exception.
+    """
+
+    try:
+        return validate_task(task)
+    except FinvizInvalidFilterError as exc:
+        task.setdefault("open_questions", []).append(f"DSL validation failed: {exc}")
+        return task
+
+
 def normalize_request(request_text: str) -> dict:
     request_text = _clean_request_text(request_text)
     if not request_text:
-        return _semantic_fallback("")
+        return _validate_or_flag(_semantic_fallback(""))
 
     try:
         llm_task = _coerce_task(_llm_interpret(request_text), request_text)
         if not llm_task.get("workflow"):
             raise ValueError("Missing workflow from LLM response")
-        return llm_task
+        return _validate_or_flag(llm_task)
     except (LLMError, ValueError, json.JSONDecodeError):
-        return _semantic_fallback(request_text)
+        return _validate_or_flag(_semantic_fallback(request_text))
 
 
 def render_notes(task: dict) -> str:

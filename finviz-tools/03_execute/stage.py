@@ -10,6 +10,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from shared.finviz.errors import FinvizInvalidFilterError
+
 STAGE_DIR = Path(__file__).resolve().parent
 INTAKE_DIR = STAGE_DIR.parent / "01_intake" / "output"
 PLAN_DIR = STAGE_DIR.parent / "02_plan" / "output"
@@ -170,6 +172,31 @@ def _render_generic_draft(task: dict, plan: dict) -> str:
     return "\n".join(lines)
 
 
+def _render_unresolved_criteria_draft(task: dict, criteria: dict, exc: Exception) -> str:
+    """Produce a readable draft when criteria can't be mapped to a Finviz filter.
+
+    A crashed stage leaves nothing to review; this keeps the stage's output an
+    inspectable, editable artifact per ICM's "every output is an edit surface"
+    principle, so the human can fix the criteria and re-run this stage.
+    """
+
+    return "\n".join([
+        "# Draft Output",
+        "",
+        "## Objective",
+        str(task.get("objective") or task.get("request") or "Finviz screen request"),
+        "",
+        "## Result",
+        f"Could not compile the requested criteria into a Finviz filter: {exc}",
+        "",
+        "## Criteria",
+        "```json",
+        json.dumps(criteria, indent=2, default=str),
+        "```",
+        "",
+    ])
+
+
 def _run_finviz(task: dict, plan: dict) -> str:
     from shared.finviz import (
         compile_semantic_filters,
@@ -216,13 +243,22 @@ def _run_finviz(task: dict, plan: dict) -> str:
         }
         artifact_path = ARTIFACTS_DIR / "analyst-targets.json"
     else:
-        rows = screen(criteria)
-        result = {"rows": rows, "count": len(rows), "criteria": criteria}
-        artifact_path = ARTIFACTS_DIR / "screen.json"
+        # If ranking is requested, don't let `limit` cap the fetch itself -
+        # ranking a pre-truncated sample would not yield the true top N.
+        fetch_criteria = dict(criteria)
+        if ranking:
+            fetch_criteria.pop("limit", None)
+
+        try:
+            rows = screen(fetch_criteria)
+        except FinvizInvalidFilterError as exc:
+            return _render_unresolved_criteria_draft(task, criteria, exc)
 
         if ranking:
             rows = _rank_rows(rows, ranking)
-            result["rows"] = rows
+        rows = rows[:limit]
+        result = {"rows": rows, "count": len(rows), "criteria": criteria}
+        artifact_path = ARTIFACTS_DIR / "screen.json"
 
     artifact_path.write_text(json.dumps(result, indent=2, default=str) + "\n", encoding="utf-8")
 

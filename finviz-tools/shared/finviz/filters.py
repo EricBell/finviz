@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Any
 
+from .catalog import full_catalog as _full_catalog
 from .compile import compile_semantic_filters
 from .config import DEFAULT_ORDER, DEFAULT_TABLE
 from .errors import FinvizInvalidFilterError
@@ -36,13 +37,12 @@ def normalize_query(request: Any) -> dict:
 def get_filter_options(reload: bool = False) -> dict:
     """Return the nested Finviz filter dictionary.
 
-    If reload is True, force a fresh fetch from Finviz; otherwise prefer the
-    cached filters.json when available.
+    Delegates to catalog.py's cached loader so there is a single source of
+    truth for the filters.json catalog across the workspace.
     """
 
-    from finviz.screener import Screener
-
-    return Screener.load_filter_dict(reload=not reload)
+    del reload  # kept for backwards-compat call sites; catalog.py owns caching
+    return _full_catalog()
 
 
 def _iter_values(value: Any) -> Iterable[Any]:
@@ -84,7 +84,7 @@ def build_screener_kwargs(criteria: dict) -> dict:
     return {
         "tickers": criteria.get("tickers"),
         "filters": build_filters(criteria),
-        "rows": criteria.get("rows"),
+        "rows": criteria.get("rows") or criteria.get("limit"),
         "order": criteria.get("order", DEFAULT_ORDER),
         "signal": criteria.get("signal", ""),
         "table": criteria.get("table", DEFAULT_TABLE),

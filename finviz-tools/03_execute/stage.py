@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run python
 """Execute stage template.
 
 Reads the plan and produces a draft result. In a real workspace, this stage can

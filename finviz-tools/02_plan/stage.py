@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run python
 """Plan stage template.
 
 Reads the normalized task from intake and emits a simple execution plan.

@@ -4,11 +4,13 @@ A reusable, folder-based workflow for arbitrary agent tasks.
 
 ## How to use
 
+Run stages with `uv run`.
+
 1. Put the task in `00_input/request.md`
-2. Read `01_intake/CONTEXT.md` and run the intake stage
-3. Read `02_plan/CONTEXT.md` and produce a plan
-4. Read `03_execute/CONTEXT.md` and produce the working output
-5. Read `04_review/CONTEXT.md` and finalize the result
+2. Run `uv run run_stage.py 01_intake`
+3. Run `uv run run_stage.py 02_plan`
+4. Run `uv run run_stage.py 03_execute`
+5. Run `uv run run_stage.py 04_review`
 
 ## Structure
 
@@ -24,3 +26,4 @@ A reusable, folder-based workflow for arbitrary agent tasks.
 - Keep each stage focused on one job.
 - Use plain text and JSON for handoffs.
 - Human edits are allowed between stages.
+- Prefer `uv` for environment and script execution.

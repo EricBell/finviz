@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run python
 """Review stage template.
 
 Reads the draft and produces a final pass plus review notes.

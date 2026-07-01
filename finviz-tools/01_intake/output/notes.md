@@ -1,7 +1,7 @@
 # Intake Notes
 
 ## Request
-Find low priced breakout stocks with relative volume above 2 and price above the 50 day moving average. Return the 7 strongest.
+Find top 5 large cap energy stocks that are up at least 3% since the open.
 
 ## Objective
 Finviz screen request
@@ -13,12 +13,9 @@ Finviz screen request
   "mode": "screen",
   "criteria": {
     "filters": [
-      "sh_price_u10",
-      "sh_relvol_o2",
-      "ta_sma50_pa"
+      "cap_large"
     ],
-    "rows": 7,
-    "order": "-change",
+    "rows": 5,
     "table": "Overview",
     "request_method": "sequential",
     "sort_hint": [
@@ -35,10 +32,7 @@ Finviz screen request
 - Use Finviz filters and return a concise result set.
 
 ## Assumptions
-- Interpreted low-priced language as under $10.
-- Interpreted relative volume > 2 as a Finviz relative volume filter.
-- Interpreted 'above SMA50' as price above the moving average.
-- Used price change as a proxy for 'strongest'.
+- Interpreted 'large cap' as Finviz cap_large.
 
 ## Open Questions
 - none recorded

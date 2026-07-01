@@ -1,1 +1,1 @@
-Find low priced breakout stocks with relative volume above 2 and price above the 50 day moving average. Return the 7 strongest.
+Find top 5 large cap energy stocks that are up at least 3% since the open.

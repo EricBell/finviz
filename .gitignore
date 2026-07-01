@@ -113,3 +113,7 @@ ENV/
 *.csv
 
 **/output/**/*.json
+**/00-input/
+**/01_intake/ouput/
+**/03_execute/output/
+**/04_review/output/

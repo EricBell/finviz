@@ -1,0 +1,20 @@
+{
+  "objective": null,
+  "steps": [
+    {
+      "name": "execute",
+      "description": "Perform the requested work using the structured task and any shared helpers."
+    },
+    {
+      "name": "review",
+      "description": "Validate the output against the task and summarize any issues."
+    }
+  ],
+  "dependencies": [
+    "01_intake/output/task.json",
+    "01_intake/output/notes.md"
+  ],
+  "risks": [
+    "Task may be underspecified and require assumptions."
+  ]
+}

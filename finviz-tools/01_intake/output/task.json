@@ -1,0 +1,8 @@
+{
+  "request": "# Task Request\n\nWrite your task here.",
+  "objective": null,
+  "constraints": [],
+  "expected_output": null,
+  "assumptions": [],
+  "open_questions": []
+}

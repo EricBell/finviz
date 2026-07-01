@@ -53,7 +53,7 @@ def _find_finviz_payload(task: dict) -> dict[str, Any] | None:
     return None
 
 
-def _extract_finviz_criteria(task: dict) -> tuple[dict[str, Any], str]:
+def _extract_finviz_criteria(task: dict) -> tuple[dict[str, Any], str, str]:
     payload = _find_finviz_payload(task) or {}
     criteria = payload.get("criteria") if isinstance(payload.get("criteria"), dict) else {}
 
@@ -61,15 +61,12 @@ def _extract_finviz_criteria(task: dict) -> tuple[dict[str, Any], str]:
         criteria = {
             key: value
             for key, value in payload.items()
-            if key not in {"mode", "operation", "action", "criteria"}
+            if key not in {"mode", "operation", "action", "criteria", "tool"}
         }
 
-    mode = (
-        str(payload.get("mode") or payload.get("operation") or payload.get("action") or criteria.get("mode") or "screen")
-        .strip()
-        .lower()
-    )
-    return criteria, mode
+    tool = str(payload.get("tool") or payload.get("mode") or payload.get("operation") or payload.get("action") or criteria.get("tool") or "finviz.screen").strip().lower()
+    mode = tool.split(".")[-1]
+    return criteria, mode, tool
 
 
 def _should_use_finviz(task: dict) -> bool:
@@ -92,6 +89,33 @@ def _select_columns(rows: list[dict]) -> list[str]:
         return columns
     first = rows[0]
     return list(first.keys())[:8]
+
+
+def _rank_rows(rows: list[dict], ranking: dict) -> list[dict]:
+    primary = str(ranking.get("primary") or ranking.get("sort_by") or "").lower()
+    direction = str(ranking.get("direction") or "desc").lower()
+
+    def _num(value: Any) -> float:
+        if value is None:
+            return float("-inf")
+        s = str(value).replace(",", "").replace("%", "").strip()
+        try:
+            return float(s)
+        except ValueError:
+            return float("-inf")
+
+    def _key(row: dict) -> float:
+        if primary in {"change", "price change", "change_from_open", "change from open"}:
+            return _num(row.get("Change"))
+        if primary in {"volume", "vol"}:
+            return _num(row.get("Volume"))
+        if primary in {"market_cap", "market cap", "cap"}:
+            return _num(str(row.get("Market Cap", "")).replace("B", "000").replace("M", ""))
+        if primary in {"relative_volume", "rvol", "relative volume"}:
+            return _num(row.get("Relative Volume") or row.get("Rel Volume"))
+        return _num(row.get("Change"))
+
+    return sorted(rows, key=_key, reverse=direction != "asc")
 
 
 def _render_markdown_table(rows: list[dict], limit: int = 10) -> str:
@@ -147,10 +171,19 @@ def _render_generic_draft(task: dict, plan: dict) -> str:
 
 
 def _run_finviz(task: dict, plan: dict) -> str:
-    from shared.finviz import get_all_news, get_analyst_targets, get_insider, get_news, get_stock, screen
+    from shared.finviz import (
+        compile_semantic_filters,
+        get_all_news,
+        get_analyst_targets,
+        get_insider,
+        get_news,
+        get_stock,
+        screen,
+    )
 
-    criteria, mode = _extract_finviz_criteria(task)
-    limit = int(criteria.get("limit") or 10)
+    criteria, mode, tool = _extract_finviz_criteria(task)
+    limit = int(criteria.get("limit") or criteria.get("rows") or 10)
+    ranking = criteria.get("ranking") or {}
 
     result: dict[str, Any]
     artifact_path: Path
@@ -186,6 +219,10 @@ def _run_finviz(task: dict, plan: dict) -> str:
         rows = screen(criteria)
         result = {"rows": rows, "count": len(rows), "criteria": criteria}
         artifact_path = ARTIFACTS_DIR / "screen.json"
+
+        if ranking:
+            rows = _rank_rows(rows, ranking)
+            result["rows"] = rows
 
     artifact_path.write_text(json.dumps(result, indent=2, default=str) + "\n", encoding="utf-8")
 

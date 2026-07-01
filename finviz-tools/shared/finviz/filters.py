@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Any
 
+from .compile import compile_semantic_filters
 from .config import DEFAULT_ORDER, DEFAULT_TABLE
 from .errors import FinvizInvalidFilterError
 
@@ -57,31 +58,10 @@ def _iter_values(value: Any) -> Iterable[Any]:
 def build_filters(criteria: dict) -> list[str]:
     """Build a flat list of Finviz filter tags from a criteria dict.
 
-    Supported inputs:
-    - ``filters``: direct Finviz filter tags
-    - ``filter_groups``: mapping of Finviz category name -> selected option(s)
+    Supports both direct Finviz tags and semantic criteria.
     """
 
-    filters: list[str] = []
-
-    direct_filters = criteria.get("filters") or []
-    for item in _iter_values(direct_filters):
-        if item:
-            filters.append(str(item))
-
-    grouped = criteria.get("filter_groups") or {}
-    if grouped:
-        options = get_filter_options(reload=criteria.get("reload_filters", False))
-        for group_name, selected in grouped.items():
-            group = options.get(group_name)
-            if group is None:
-                raise FinvizInvalidFilterError(f"Unknown filter group: {group_name}")
-            for choice in _iter_values(selected):
-                if choice not in group:
-                    raise FinvizInvalidFilterError(
-                        f"Unknown filter choice {choice!r} in group {group_name!r}"
-                    )
-                filters.append(group[choice])
+    filters = compile_semantic_filters(criteria)
 
     # De-duplicate while preserving order.
     return list(dict.fromkeys(filters))

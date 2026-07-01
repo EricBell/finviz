@@ -10,29 +10,30 @@ Finviz screen request
 ```json
 {
   "domain": "finviz",
+  "tool": "finviz.screen",
   "mode": "screen",
   "criteria": {
-    "filters": [
-      "cap_large"
-    ],
-    "rows": 5,
-    "table": "Overview",
-    "request_method": "sequential",
-    "sort_hint": [
-      "gap",
-      "relative volume",
-      "price change",
-      "liquidity"
-    ]
+    "sector": "Energy",
+    "market_cap": {
+      "class": "large"
+    },
+    "performance": {
+      "change_from_open_gte": 3
+    },
+    "limit": 5,
+    "ranking": {
+      "primary": "change_from_open",
+      "direction": "desc"
+    }
   }
 }
 ```
 
 ## Constraints
-- Use Finviz filters and return a concise result set.
+- Use the selected Finviz tool and return a concise result set.
 
 ## Assumptions
-- Interpreted 'large cap' as Finviz cap_large.
+- Interpreted 'large cap' as a large-cap Finviz screen.
 
 ## Open Questions
 - none recorded

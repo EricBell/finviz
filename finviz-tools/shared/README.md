@@ -16,5 +16,11 @@ This folder holds reusable guidance and code for all stages.
 - stock quote lookups
 - news / insider / analyst data
 - filter translation and normalization
+- semantic criteria compilation
+
+## LLM helper
+
+`shared/llm.py` provides a thin wrapper around an OpenAI-compatible chat
+completion endpoint for request interpretation.
 
 Keep shared files stable across runs.

@@ -39,6 +39,15 @@ FINVIZ_HINTS = (
     "price target",
     "rating",
     "quote",
+    "rvol",
+    "relative volume",
+    "moving average",
+    "sma",
+    "breakout",
+    "bullish",
+    "momentum",
+    "liquidity",
+    "penny",
 )
 
 COMMON_TICKER_BLACKLIST = {
@@ -164,43 +173,222 @@ def _gap_filter(text: str) -> tuple[list[str], list[str]]:
     return filters, assumptions
 
 
+def _market_cap_filters(text: str) -> tuple[list[str], list[str]]:
+    lowered = text.lower()
+    filters: list[str] = []
+    assumptions: list[str] = []
+
+    exact_map = [
+        ("mega cap", "cap_mega", "Interpreted 'mega cap' as Finviz cap_mega."),
+        ("large cap", "cap_large", "Interpreted 'large cap' as Finviz cap_large."),
+        ("mid cap", "cap_mid", "Interpreted 'mid cap' as Finviz cap_mid."),
+        ("small cap", "cap_small", "Interpreted 'small cap' as Finviz cap_small."),
+        ("micro cap", "cap_micro", "Interpreted 'micro cap' as Finviz cap_micro."),
+        ("nano cap", "cap_nano", "Interpreted 'nano cap' as Finviz cap_nano."),
+    ]
+    has_cap_context = "market cap" in lowered or "marketcap" in lowered or any(phrase in lowered for phrase, _, _ in exact_map)
+    for phrase, tag, note in exact_map:
+        if phrase in lowered:
+            filters.append(tag)
+            assumptions.append(note)
+            break
+
+    def _value_to_millions(value: float, unit: str | None) -> float:
+        unit = (unit or "").lower()
+        if unit in {"b", "bn", "billion"}:
+            return value * 1000.0
+        if unit in {"k", "thousand"}:
+            return value / 1000.0
+        return value
+
+    def _under_filter(millions: float) -> str:
+        if millions <= 50:
+            return "cap_nano"
+        if millions <= 300:
+            return "cap_microunder"
+        if millions <= 2000:
+            return "cap_smallunder"
+        if millions <= 10000:
+            return "cap_midunder"
+        return "cap_largeunder"
+
+    def _over_filter(millions: float) -> str:
+        if millions >= 10000:
+            return "cap_largeover"
+        if millions >= 2000:
+            return "cap_midover"
+        if millions >= 300:
+            return "cap_smallover"
+        return "cap_microover"
+
+    if has_cap_context:
+        patterns = [
+            r"\b(?P<direction>under|below|less than|sub|over|above|greater than)\s+\$?\s*(?P<value>[\d,.]+)\s*(?P<unit>bn|billion|b|mm|million|m|k|thousand)?\s*(?:market cap|cap)?",
+            r"(?:market cap|cap)\s*(?P<direction>under|below|less than|sub|over|above|greater than)\s+\$?\s*(?P<value>[\d,.]+)\s*(?P<unit>bn|billion|b|mm|million|m|k|thousand)?",
+        ]
+        for pattern in patterns:
+            match = re.search(pattern, lowered)
+            if not match:
+                continue
+            direction = match.group("direction")
+            value = float(match.group("value").replace(",", ""))
+            millions = _value_to_millions(value, match.group("unit"))
+            filters.append(_under_filter(millions) if direction in {"under", "below", "less than", "sub"} else _over_filter(millions))
+            assumptions.append(f"Interpreted market cap {direction} {match.group('value')} as a Finviz market cap filter.")
+            break
+
+    return list(dict.fromkeys(filters)), assumptions
+
+
+def _price_filters(text: str) -> tuple[list[str], list[str]]:
+    lowered = text.lower()
+    filters: list[str] = []
+    assumptions: list[str] = []
+
+    def _price_tag(direction: str, value: float) -> str:
+        thresholds = [1, 2, 3, 4, 5, 7, 10, 15, 20, 30, 40, 50]
+        for threshold in thresholds:
+            if direction == "under" and value <= threshold:
+                return f"sh_price_u{int(threshold) if float(threshold).is_integer() else threshold}"
+            if direction == "over" and value <= threshold:
+                return f"sh_price_o{int(threshold) if float(threshold).is_integer() else threshold}"
+        return "sh_price_u50" if direction == "under" else "sh_price_o50"
+
+    if any(phrase in lowered for phrase in ("low priced", "cheap", "penny stock")):
+        filters.append("sh_price_u10")
+        assumptions.append("Interpreted low-priced language as under $10.")
+
+    if "moving average" not in lowered and "sma" not in lowered:
+        match = re.search(r"\b(?P<direction>under|below|less than|sub|over|above|greater than)\s+\$?\s*(?P<value>[\d.]+)", lowered)
+        if match:
+            direction = match.group("direction")
+            value = float(match.group("value"))
+            filters.append(_price_tag(direction, value))
+            assumptions.append(f"Interpreted price {direction} {match.group('value')} as a Finviz price filter.")
+
+    return list(dict.fromkeys(filters)), assumptions
+
+
+def _relative_volume_filters(text: str) -> tuple[list[str], list[str]]:
+    lowered = text.lower()
+    filters: list[str] = []
+    assumptions: list[str] = []
+
+    match = re.search(r"\b(?:rvol|rv|relative volume|rel volume|rel vol)\s*(?:is|above|over|>|>=)?\s*([\d.]+)", lowered)
+    if match:
+        value = float(match.group(1))
+        thresholds = [0.25, 0.5, 0.75, 1, 1.5, 2, 3, 5, 10]
+        tag = None
+        for threshold in thresholds:
+            if value <= threshold:
+                tag = f"sh_relvol_o{threshold}"
+                break
+        if tag is None:
+            tag = "sh_relvol_o10"
+        filters.append(tag)
+        assumptions.append(f"Interpreted relative volume > {match.group(1)} as a Finviz relative volume filter.")
+    elif any(phrase in lowered for phrase in ("relative volume", "rvol", "high volume", "unusual volume")):
+        filters.append("sh_relvol_o2")
+        assumptions.append("Interpreted volume strength as relative volume > 2.")
+
+    if any(phrase in lowered for phrase in ("liquidity", "liquid", "tradable", "active volume")):
+        filters.append("sh_avgvol_o500")
+        assumptions.append("Interpreted liquidity request as average volume over 500K.")
+
+    return list(dict.fromkeys(filters)), assumptions
+
+
+def _sma_filters(text: str) -> tuple[list[str], list[str]]:
+    lowered = text.lower()
+    filters: list[str] = []
+    assumptions: list[str] = []
+
+    def _period_aliases(period: int) -> list[str]:
+        return [
+            f"sma{period}",
+            f"sma {period}",
+            f"{period}-day moving average",
+            f"{period} day moving average",
+            f"{period} day sma",
+            f"{period}dma",
+        ]
+
+    def _tag(period: int, suffix: str) -> str:
+        return f"ta_sma{period}_{suffix}"
+
+    for period in (20, 50, 200):
+        if not any(alias in lowered for alias in _period_aliases(period)):
+            continue
+        if any(phrase in lowered for phrase in ("crossed above", "cross above", "broke above", "break above")):
+            filters.append(_tag(period, "pca"))
+            assumptions.append(f"Interpreted SMA{period} breakout as price crossed above the moving average.")
+        elif any(phrase in lowered for phrase in ("crossed below", "cross below", "broke below", "break below")):
+            filters.append(_tag(period, "pcb"))
+            assumptions.append(f"Interpreted SMA{period} weakness as price crossed below the moving average.")
+        elif any(phrase in lowered for phrase in ("above", "over", "bullish")) and not any(
+            phrase in lowered for phrase in ("below", "under")
+        ):
+            filters.append(_tag(period, "pa"))
+            assumptions.append(f"Interpreted 'above SMA{period}' as price above the moving average.")
+        elif any(phrase in lowered for phrase in ("below", "under")):
+            filters.append(_tag(period, "pb"))
+            assumptions.append(f"Interpreted 'below SMA{period}' as price below the moving average.")
+
+    if any(phrase in lowered for phrase in ("breakout", "momentum", "bullish")) and not filters:
+        filters.extend(["ta_sma20_pa", "sh_relvol_o2"])
+        assumptions.append("Interpreted momentum/breakout language as price above SMA20 with relative volume > 2.")
+
+    return list(dict.fromkeys(filters)), assumptions
+
+
 def _screen_criteria(text: str) -> tuple[dict[str, Any], list[str], list[str]]:
     criteria: dict[str, Any] = {}
     assumptions: list[str] = []
     open_questions: list[str] = []
 
     filters: list[str] = []
-    cap_filters, cap_assumptions = _small_cap_filter(text)
+    cap_filters, cap_assumptions = _market_cap_filters(text)
     gap_filters, gap_assumptions = _gap_filter(text)
+    price_filters, price_assumptions = _price_filters(text)
+    rvol_filters, rvol_assumptions = _relative_volume_filters(text)
+    sma_filters, sma_assumptions = _sma_filters(text)
+
     filters.extend(cap_filters)
     filters.extend(gap_filters)
+    filters.extend(price_filters)
+    filters.extend(rvol_filters)
+    filters.extend(sma_filters)
+
     assumptions.extend(cap_assumptions)
     assumptions.extend(gap_assumptions)
+    assumptions.extend(price_assumptions)
+    assumptions.extend(rvol_assumptions)
+    assumptions.extend(sma_assumptions)
 
     lowered = text.lower()
     order = ""
-    if any(word in lowered for word in ("strongest", "best", "most bullish", "highest momentum")):
+    if any(word in lowered for word in ("strongest", "best", "most bullish", "highest momentum", "most active")):
         order = "-change"
         assumptions.append("Used price change as a proxy for 'strongest'.")
-    elif "volume" in lowered or "liquidity" in lowered:
+    elif any(word in lowered for word in ("volume", "liquidity", "rvol", "relative volume")):
         order = "-volume"
         assumptions.append("Used volume as a proxy for strength.")
 
     requested_limit = _requested_limit(text)
     if requested_limit is not None:
         limit = requested_limit
-    elif any(word in lowered for word in ("strongest", "top", "best")):
+    elif any(word in lowered for word in ("strongest", "top", "best", "highest")):
         limit = 5
     else:
         limit = 10
 
-    criteria["filters"] = filters
+    criteria["filters"] = list(dict.fromkeys(filters))
     criteria["rows"] = limit
     if order:
         criteria["order"] = order
     criteria["table"] = "Overview"
     criteria["request_method"] = "sequential"
-    criteria["sort_hint"] = ["gap", "volume", "liquidity"]
+    criteria["sort_hint"] = ["gap", "relative volume", "price change", "liquidity"]
 
     if not filters:
         open_questions.append("No explicit screener filters were inferred; review the request before execution.")

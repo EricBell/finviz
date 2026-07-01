@@ -1,7 +1,7 @@
 # Intake Notes
 
 ## Request
-I want a screen of small cap stocks that are gapping up. Return the 5 strongest tickers.
+Find low priced breakout stocks with relative volume above 2 and price above the 50 day moving average. Return the 7 strongest.
 
 ## Objective
 Finviz screen request
@@ -13,16 +13,18 @@ Finviz screen request
   "mode": "screen",
   "criteria": {
     "filters": [
-      "cap_small",
-      "ta_gap_u3"
+      "sh_price_u10",
+      "sh_relvol_o2",
+      "ta_sma50_pa"
     ],
-    "rows": 5,
+    "rows": 7,
     "order": "-change",
     "table": "Overview",
     "request_method": "sequential",
     "sort_hint": [
       "gap",
-      "volume",
+      "relative volume",
+      "price change",
       "liquidity"
     ]
   }
@@ -33,8 +35,9 @@ Finviz screen request
 - Use Finviz filters and return a concise result set.
 
 ## Assumptions
-- Interpreted 'small cap' as Finviz cap_small.
-- Interpreted 'gapping up' as a 3%+ gap filter.
+- Interpreted low-priced language as under $10.
+- Interpreted relative volume > 2 as a Finviz relative volume filter.
+- Interpreted 'above SMA50' as price above the moving average.
 - Used price change as a proxy for 'strongest'.
 
 ## Open Questions

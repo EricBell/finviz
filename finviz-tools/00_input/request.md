@@ -1,1 +1,1 @@
-I want a screen of small cap stocks that are gapping up. Return the 5 strongest tickers.
+Find low priced breakout stocks with relative volume above 2 and price above the 50 day moving average. Return the 7 strongest.

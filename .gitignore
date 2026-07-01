@@ -113,9 +113,10 @@ ENV/
 *.csv
 
 **/output/**/*.json
-**/00-input/
+**/00_input/request.md
 **/01_intake/ouput/
 **/03_execute/output/
 **/04_review/output/
+**/output/notes.md
 
 add-keys.sh
